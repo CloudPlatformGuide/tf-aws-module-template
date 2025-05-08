@@ -1,0 +1,72 @@
+name: Publish Terraform Module to S3
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (leave empty to use latest tag)"
+        required: false
+        default: ""
+      region:
+        required: false
+        default: "us-east-1"
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      REGION: ${{ github.event.inputs.region || 'us-east-1' }}
+      ROLE: "AWS-TF-GITHUB-ROLE"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/AWS-TF-GITHUB-ROLE
+          aws-region: ${{ env.REGION }}
+
+      - name: Determine version
+        id: get_version
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            # For release events, use the release tag
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          elif [[ -n "${{ github.event.inputs.version }}" ]]; then
+            # For workflow_dispatch with provided version
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            # For workflow_dispatch without version, use latest tag
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+            echo "VERSION=${LATEST_TAG}" >> $GITHUB_OUTPUT
+          fi
+
+          echo "Using version: $(cat $GITHUB_OUTPUT | grep VERSION | cut -d= -f2)"
+
+      - name: Package module
+        run: |
+          MODULE_NAME=$(basename $GITHUB_REPOSITORY | cut -d'/' -f2)
+          VERSION=${{ steps.get_version.outputs.VERSION }}
+          mkdir -p dist
+
+          # Create zip file directly from the repository root
+          # Exclude unnecessary files
+          zip -r dist/${MODULE_NAME}-${VERSION}.zip . \
+            -x "*.git*" -x "dist/*" -x ".github/*" -x ".DS_Store"
+
+          echo "Created zip file: dist/${MODULE_NAME}-${VERSION}.zip"
+
+      - name: Upload to S3
+        run: |
+          MODULE_NAME=$(basename $GITHUB_REPOSITORY | cut -d'/' -f2)
+          VERSION=${{ steps.get_version.outputs.VERSION }}
+
+          # Upload the zip file to a modules directory in S3
+           aws s3 cp dist/${MODULE_NAME}-${VERSION}.zip s3://${{ secrets.S3_BUCKET_NAME }}/modules/${MODULE_NAME}-${VERSION}.zip
+
+          echo "Module zip published to s3://${{ secrets.S3_BUCKET_NAME }}/modules/${MODULE_NAME}-${VERSION}.zip"
