@@ -1,0 +1,11 @@
+.terraform.*
+.terraform
+terraform.tfstate
+terraform.tfstate.backup
+plan_output.txt
+state.config
+tf.plan
+tfplan.*
+tf_changes.json
+.DS_Store
+remote_modules

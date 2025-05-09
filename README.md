@@ -108,10 +108,6 @@ terraform-docs --config .config/.terraform-docs.yml .
 
 4. Documentation will be inserted between the `<!-- BEGIN_TF_DOCS -->` and `<!-- END_TF_DOCS -->` markers in this README (It will replace this existing content in the repo template).
 
-### GitHub Action for Documentation
-
-You can set up a GitHub Action to automatically update documentation on pull requests by adding a workflow file.
-
 ## Getting Started
 
 To use this template:

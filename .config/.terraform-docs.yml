@@ -15,15 +15,10 @@ content: |-
 
   ## Example:
 
-  ### Cross Region
   ```hcl
-  {{ include "examples/cross_region.tf"}}
+  {{ include "examples/basic.tf"}}
   ```
 
-  ### Same Region
-   ```hcl
-  {{ include "examples/same_region.tf"}}
-  ```
 
   {{.Inputs}}
   {{.Outputs}}
