@@ -209,6 +209,7 @@ cmd_publish() {
 cmd_plan() {
     local example="${1:-basic}"
     export_tf_env
+    # shellcheck source=tf.sh
     source "$TF_SH"
     if ! maybe_init "$example"; then return 1; fi
     plan_terraform "$example"
@@ -221,6 +222,7 @@ cmd_plan() {
 cmd_apply() {
     local example="${1:-basic}"
     export_tf_env
+    # shellcheck source=tf.sh
     source "$TF_SH"
     if ! maybe_init "$example"; then return 1; fi
     apply_terraform "$example"
@@ -231,6 +233,7 @@ cmd_apply() {
 cmd_destroy() {
     local example="${1:-basic}"
     export_tf_env
+    # shellcheck source=tf.sh
     source "$TF_SH"
     if ! maybe_init "$example"; then return 1; fi
     destroy_terraform "$example"
