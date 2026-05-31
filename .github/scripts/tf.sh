@@ -349,47 +349,47 @@ security_scan_terraform() {
     if command -v "checkov" &> /dev/null; then
         log_info "Running checkov"
         run_checkov_scan || exit_code=1
-        (( tools_run++ ))
+        (( ++tools_run ))
     else
         log_warn "checkov not found, skipping (install: pip install checkov)"
-        (( tools_skipped++ ))
+        (( ++tools_skipped ))
     fi
 
     if command -v "tfsec" &> /dev/null; then
         log_info "Running tfsec"
         run_tfsec_scan || exit_code=1
-        (( tools_run++ ))
+        (( ++tools_run ))
     else
         log_warn "tfsec not found, skipping (install: brew install tfsec)"
-        (( tools_skipped++ ))
+        (( ++tools_skipped ))
     fi
 
     if command -v "shellcheck" &> /dev/null; then
         log_info "Running shellcheck on scripts/"
         run_shellcheck_scan || exit_code=1
-        (( tools_run++ ))
+        (( ++tools_run ))
     else
         log_warn "shellcheck not found, skipping (install: brew install shellcheck)"
-        (( tools_skipped++ ))
+        (( ++tools_skipped ))
     fi
 
     # conftest — only meaningful if we have a plan artifact AND policies exist
     if ! command -v "conftest" &> /dev/null; then
         log_warn "conftest not found, skipping (install: brew install conftest)"
-        (( tools_skipped++ ))
+        (( ++tools_skipped ))
     elif [[ ! -d "${TERRAFORM_ROOT}/../policies/conftest" ]]; then
         log_warn "conftest installed but no policies found at policies/conftest/ — skipping"
-        (( tools_skipped++ ))
+        (( ++tools_skipped ))
     else
         local plan_summary="${OUTPUT_DIR}/plan-summary-${environment}.json"
         if [[ -f "$plan_summary" ]]; then
             log_info "Running conftest against plan output for $environment"
             run_conftest_scan "$plan_summary" || exit_code=1
-            (( tools_run++ ))
+            (( ++tools_run ))
         else
             log_warn "conftest available but no plan output found at $plan_summary"
             log_warn "Run 'plan $environment' first to enable conftest policy checks"
-            (( tools_skipped++ ))
+            (( ++tools_skipped ))
         fi
     fi
 
