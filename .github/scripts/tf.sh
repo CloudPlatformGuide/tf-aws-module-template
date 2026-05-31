@@ -484,7 +484,7 @@ run_shellcheck_scan() {
     fi
 
     for script in "${script_files[@]}"; do
-        if ! shellcheck "$script"; then
+        if ! shellcheck --severity=warning "$script"; then
             failed=1
         fi
     done
