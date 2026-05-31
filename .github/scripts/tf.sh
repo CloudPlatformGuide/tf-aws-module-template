@@ -425,14 +425,19 @@ run_checkov_scan() {
     # not the exit code. Use || true so set -e doesn't fire prematurely.
     checkov "${checkov_args[@]}" --output json > "$output_file" 2>&1 || true
 
-    if ! jq -e '.results' "$output_file" > /dev/null 2>&1; then
+    # Checkov 2.x wraps results under a `.results` key; checkov 3.x emits a flat
+    # summary `{passed, failed, skipped, resource_count}` — including when no
+    # resources matched any checks (resource_count=0). Support both.
+    local failed_checks
+    if jq -e '.results.failed_checks' "$output_file" > /dev/null 2>&1; then
+        failed_checks=$(jq '.results.failed_checks | length' "$output_file")
+    elif jq -e '.failed' "$output_file" > /dev/null 2>&1; then
+        failed_checks=$(jq '.failed' "$output_file")
+    else
         log_error "Checkov scan failed — could not parse output (see ${output_file})"
         cat "$output_file" >&2 || true
         return 1
     fi
-
-    local failed_checks
-    failed_checks=$(jq '.results.failed_checks | length' "$output_file" 2>/dev/null || echo "0")
 
     if [[ "$failed_checks" -gt 0 ]]; then
         log_warn "Checkov found $failed_checks security issue(s)"
