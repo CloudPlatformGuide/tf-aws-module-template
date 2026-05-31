@@ -32,7 +32,8 @@ jobs:
       - name: Install security tools
         run: |
           pip install checkov --quiet
-          curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
+          curl -sL "https://github.com/aquasecurity/tfsec/releases/latest/download/tfsec-linux-amd64" \
+            -o /usr/local/bin/tfsec && chmod +x /usr/local/bin/tfsec
 
       - name: Validate
         run: bash .github/scripts/module.sh validate
