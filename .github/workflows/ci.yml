@@ -1,0 +1,210 @@
+name: Terraform Module Workflow
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      skip-destroy:
+        description: "Skip the destroy job (leave the example deployment running)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.12.0"
+
+      - name: Install security tools
+        run: |
+          pip install checkov --quiet
+          curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
+
+      - name: Validate
+        run: bash .github/scripts/module.sh validate
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.12.0"
+
+      - name: Test
+        run: bash .github/scripts/module.sh test
+        env:
+          TF_IN_AUTOMATION: "true"
+
+  plan:
+    name: Plan
+    needs: [validate, test]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      ROLE: ${{ vars.AWS_ROLE_NAME || 'AWS-TF-GITHUB-ROLE' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.12.0"
+
+      - name: Write backend config
+        # Config-only mode: writes examples/basic/state.config from the supplied
+        # values without making any AWS API calls. Runs before OIDC auth so the
+        # backend config is in place when terraform init runs.
+        env:
+          KMS_KEY_ID: ${{ secrets.TF_STATE_KMS_KEY_ID }}
+        run: |
+          bash .github/scripts/module.sh bootstrap \
+            --bucket      "${{ secrets.S3_BUCKET_NAME }}" \
+            --environment basic \
+            --region      "${{ env.REGION }}" \
+            --github-org  "${{ github.repository_owner }}" \
+            --github-repo "${{ github.event.repository.name }}" \
+            --kms-key     "${{ secrets.TF_STATE_KMS_KEY_ID }}" \
+            --skip-oidc-and-role
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.ROLE }}
+          aws-region: ${{ env.REGION }}
+
+      - name: Plan
+        run: bash .github/scripts/module.sh plan basic
+        env:
+          TF_IN_AUTOMATION: "true"
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-basic-${{ github.run_id }}
+          path: |
+            plans/
+            outputs/latest-plan-basic.txt
+            outputs/plan-summary-basic.json
+
+  apply:
+    name: Apply
+    needs: plan
+    # Apply only runs on push to main, not on pull requests.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      ROLE: ${{ vars.AWS_ROLE_NAME || 'AWS-TF-GITHUB-ROLE' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.12.0"
+
+      - name: Write backend config
+        env:
+          KMS_KEY_ID: ${{ secrets.TF_STATE_KMS_KEY_ID }}
+        run: |
+          bash .github/scripts/module.sh bootstrap \
+            --bucket      "${{ secrets.S3_BUCKET_NAME }}" \
+            --environment basic \
+            --region      "${{ env.REGION }}" \
+            --github-org  "${{ github.repository_owner }}" \
+            --github-repo "${{ github.event.repository.name }}" \
+            --kms-key     "${{ secrets.TF_STATE_KMS_KEY_ID }}" \
+            --skip-oidc-and-role
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.ROLE }}
+          aws-region: ${{ env.REGION }}
+
+      - name: Download plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-basic-${{ github.run_id }}
+
+      - name: Apply
+        # AUTO_APPROVE=true skips the interactive confirmation inside apply_terraform.
+        # Init runs automatically on this fresh runner before applying the saved plan.
+        run: bash .github/scripts/module.sh apply basic
+        env:
+          TF_IN_AUTOMATION: "true"
+          AUTO_APPROVE: "true"
+
+  destroy:
+    name: Destroy
+    needs: apply
+    # Runs after every successful apply unless skip-destroy was set to true.
+    # On pull requests, apply is skipped so destroy is automatically skipped too.
+    if: github.ref == 'refs/heads/main' && github.event.inputs.skip-destroy != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      ROLE: ${{ vars.AWS_ROLE_NAME || 'AWS-TF-GITHUB-ROLE' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.12.0"
+
+      - name: Write backend config
+        env:
+          KMS_KEY_ID: ${{ secrets.TF_STATE_KMS_KEY_ID }}
+        run: |
+          bash .github/scripts/module.sh bootstrap \
+            --bucket      "${{ secrets.S3_BUCKET_NAME }}" \
+            --environment basic \
+            --region      "${{ env.REGION }}" \
+            --github-org  "${{ github.repository_owner }}" \
+            --github-repo "${{ github.event.repository.name }}" \
+            --kms-key     "${{ secrets.TF_STATE_KMS_KEY_ID }}" \
+            --skip-oidc-and-role
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ env.ROLE }}
+          aws-region: ${{ env.REGION }}
+
+      - name: Destroy
+        run: bash .github/scripts/module.sh destroy basic
+        env:
+          TF_IN_AUTOMATION: "true"
+          AUTO_APPROVE: "true"

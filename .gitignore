@@ -9,3 +9,6 @@ tfplan.*
 tf_changes.json
 .DS_Store
 remote_modules
+outputs/
+plans/
+dist/
