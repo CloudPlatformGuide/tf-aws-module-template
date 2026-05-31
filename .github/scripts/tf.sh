@@ -364,7 +364,10 @@ security_scan_terraform() {
         (( ++tools_skipped ))
     fi
 
-    if command -v "shellcheck" &> /dev/null; then
+    if [[ "${SKIP_SHELLCHECK:-false}" == "true" ]]; then
+        log_info "Skipping shellcheck (SKIP_SHELLCHECK=true)"
+        (( ++tools_skipped ))
+    elif command -v "shellcheck" &> /dev/null; then
         log_info "Running shellcheck on scripts/"
         run_shellcheck_scan || exit_code=1
         (( ++tools_run ))

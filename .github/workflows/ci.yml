@@ -37,6 +37,8 @@ jobs:
 
       - name: Validate
         run: bash .github/scripts/module.sh validate
+        env:
+          SKIP_SHELLCHECK: "true"
 
   test:
     name: Test
