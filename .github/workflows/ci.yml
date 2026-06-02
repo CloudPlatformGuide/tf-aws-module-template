@@ -65,6 +65,7 @@ jobs:
     name: Plan
     needs: [validate, test]
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'dev' }}
     permissions:
       id-token: write
       contents: read
@@ -122,7 +123,7 @@ jobs:
     # Apply only runs on push to main, not on pull requests.
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment: ${{ inputs.environment || 'dev' }}
     permissions:
       id-token: write
       contents: read
@@ -177,7 +178,7 @@ jobs:
     # On pull requests, apply is skipped so destroy is automatically skipped too.
     if: github.ref == 'refs/heads/main' && github.event.inputs.skip-destroy != 'true'
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment: ${{ inputs.environment || 'dev' }}
     permissions:
       id-token: write
       contents: read
