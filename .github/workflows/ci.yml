@@ -2,15 +2,19 @@ name: Terraform Module Workflow
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
-    branches: [main, master]
+    branches: [main]
   workflow_dispatch:
     inputs:
       skip-destroy:
         description: "Skip the destroy job (leave the example deployment running)"
         type: boolean
         default: false
+      environment:
+        description: "Environment to deploy the resource"
+        type: string
+        default: "dev"
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -65,7 +69,7 @@ jobs:
       id-token: write
       contents: read
     env:
-      REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      REGION: ${{ vars.AWS_REGION || 'us-east-2' }}
       ROLE: ${{ vars.AWS_ROLE_NAME || 'AWS-TF-GITHUB-ROLE' }}
     steps:
       - name: Checkout
@@ -118,6 +122,7 @@ jobs:
     # Apply only runs on push to main, not on pull requests.
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
     permissions:
       id-token: write
       contents: read
@@ -172,6 +177,7 @@ jobs:
     # On pull requests, apply is skipped so destroy is automatically skipped too.
     if: github.ref == 'refs/heads/main' && github.event.inputs.skip-destroy != 'true'
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
     permissions:
       id-token: write
       contents: read
