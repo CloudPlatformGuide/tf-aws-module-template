@@ -77,7 +77,7 @@ jobs:
           terraform_version: "1.12.0"
 
       - name: Write backend config
-        # Config-only mode: writes examples/basic/state.config from the supplied
+        # Config-only mode: writes examples/dev/state.config from the supplied
         # values without making any AWS API calls. Runs before OIDC auth so the
         # backend config is in place when terraform init runs.
         env:
@@ -85,7 +85,7 @@ jobs:
         run: |
           bash .github/scripts/module.sh bootstrap \
             --bucket      "${{ secrets.S3_BUCKET_NAME }}" \
-            --environment basic \
+            --environment dev \
             --region      "${{ env.REGION }}" \
             --github-org  "${{ github.repository_owner }}" \
             --github-repo "${{ github.event.repository.name }}" \
@@ -99,18 +99,18 @@ jobs:
           aws-region: ${{ env.REGION }}
 
       - name: Plan
-        run: bash .github/scripts/module.sh plan basic
+        run: bash .github/scripts/module.sh plan dev
         env:
           TF_IN_AUTOMATION: "true"
 
       - name: Upload plan artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tfplan-basic-${{ github.run_id }}
+          name: tfplan-dev-${{ github.run_id }}
           path: |
             plans/
-            outputs/latest-plan-basic.txt
-            outputs/plan-summary-basic.json
+            outputs/latest-plan-dev.txt
+            outputs/plan-summary-dev.json
 
   apply:
     name: Apply
@@ -139,7 +139,7 @@ jobs:
         run: |
           bash .github/scripts/module.sh bootstrap \
             --bucket      "${{ secrets.S3_BUCKET_NAME }}" \
-            --environment basic \
+            --environment dev \
             --region      "${{ env.REGION }}" \
             --github-org  "${{ github.repository_owner }}" \
             --github-repo "${{ github.event.repository.name }}" \
@@ -155,12 +155,12 @@ jobs:
       - name: Download plan artifact
         uses: actions/download-artifact@v4
         with:
-          name: tfplan-basic-${{ github.run_id }}
+          name: tfplan-dev-${{ github.run_id }}
 
       - name: Apply
         # AUTO_APPROVE=true skips the interactive confirmation inside apply_terraform.
         # Init runs automatically on this fresh runner before applying the saved plan.
-        run: bash .github/scripts/module.sh apply basic
+        run: bash .github/scripts/module.sh apply dev
         env:
           TF_IN_AUTOMATION: "true"
           AUTO_APPROVE: "true"
@@ -193,7 +193,7 @@ jobs:
         run: |
           bash .github/scripts/module.sh bootstrap \
             --bucket      "${{ secrets.S3_BUCKET_NAME }}" \
-            --environment basic \
+            --environment dev \
             --region      "${{ env.REGION }}" \
             --github-org  "${{ github.repository_owner }}" \
             --github-repo "${{ github.event.repository.name }}" \
@@ -207,7 +207,7 @@ jobs:
           aws-region: ${{ env.REGION }}
 
       - name: Destroy
-        run: bash .github/scripts/module.sh destroy basic
+        run: bash .github/scripts/module.sh destroy dev
         env:
           TF_IN_AUTOMATION: "true"
           AUTO_APPROVE: "true"
